@@ -306,42 +306,33 @@ async function logout(){
 }
 // 房间
 async function createRoom(){
-    if(!supabase){
-        return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-    }
-    const code = genInviteCode();
-    const {data}=await supabase.from("rooms").insert([{
-        owner:currentUser.id,
-        invite_code:code,
-        movie_url:"",
-        play_status:"pause",
-        is_private:privateRoomMode
-    }]).select();
-    currentRoomId = data[0].id;
-    currentInviteCode = code;
-    document.getElementById("showRoomId").innerText = currentRoomId;
-    document.getElementById("showInviteCode").innerText = currentInviteCode;
-    alert((lang==="zh"?"房间已创建，邀请码：":"Room created, invite code: ")+code);
-    subscribeChat();
-    subscribeWebRTCSignal();
+  if(!supabase){
+    return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+  }
+  const code = genInviteCode();
+  const roomId = crypto.randomUUID();
+
+  const {data, error}=await supabase.from("rooms").insert([{
+    id: roomId,
+    owner:currentUser.id,
+    invite_code:code,
+    movie_url:"",
+    play_status:"pause",
+    is_private:privateRoomMode
+  }]).select();
+
+  if(error){
+    console.error("创建房间失败",error);
+    return alert(lang==="zh"?"创建房间失败":"Create room failed");
+  }
+
+  // 创建成功，保存房间信息
+  currentRoomId = data[0].id;
+  currentInviteCode = code;
+  document.getElementById("showRoomId").innerText = currentRoomId;
+  document.getElementById("showInviteCode").innerText = currentInviteCode;
 }
-// 通过邀请码加入房间
-async function joinByInvite(){
-    if(!supabase){
-        return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-    }
-    const code = document.getElementById("joinInviteInput").value.trim().toUpperCase();
-    if(!code)return;
-    const {data}=await supabase.from("rooms").select("*").eq("invite_code",code).single();
-    if(!data) return alert(lang==="zh"?"邀请码无效":"Invalid invite code");
-    currentRoomId = data.id;
-    currentInviteCode = code;
-    document.getElementById("showRoomId").innerText = currentRoomId;
-    document.getElementById("showInviteCode").innerText = currentInviteCode;
-    subscribeChat();
-    subscribeWebRTCSignal();
-    alert(lang==="zh"?"成功加入房间":"Joined room");
-}
+
 // 创建一对一私聊房间
 async function createPrivateRoom(){
     if(!supabase){
