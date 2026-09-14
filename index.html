@@ -571,10 +571,12 @@ async function joinByInvite() {
   console.log("joinByInvite 执行了");
   const inviteCode = document.getElementById("joinInviteInput").value.trim();
   console.log("拿到邀请码：", inviteCode);
+
   if (!inviteCode) {
     alert("请输入邀请码");
     return;
   }
+
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
@@ -596,6 +598,7 @@ async function joinByInvite() {
   //subscribeWebRTCSignal();
   alert("✅成功加入房间！现在可以发送聊天消息");
 }
+
 </script>
 </body>
 </html>
