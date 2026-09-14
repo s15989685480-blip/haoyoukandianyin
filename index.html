@@ -164,11 +164,13 @@
 const SUPABASE_URL = "https://udmexrwaacjapoicvsfz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_u49G3mGU6cekwMlgV5Yc8w_xFUIkUVO";
 var supabase = null;
-try{
+try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}catch(e){
-    console.warn("Supabase未配置，请填入真实密钥");
+    console.log("✅OK", supabase);
+} catch(e) {
+    console.error("❌真实原因", e && e.message, e);
 }
+
 // =====================================================================================
 
 // 全局状态
