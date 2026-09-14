@@ -286,6 +286,9 @@ async function createRoom(){
   currentInviteCode = code;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
+  // ✅新增：创建房间后自动开启聊天和WebRTC监听
+  subscribeChat();
+  subscribeWebRTCSignal();
 }
 // 创建一对一私聊房间
 async function createPrivateRoom(){
@@ -346,7 +349,7 @@ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, w
 return;
 }
 supabase.channel(`chat:${currentRoomId}`).on('postgres_changes', {
-event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
+event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.'${currentRoomId}'`
 },(payload)=>{
 appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
 }).subscribe();
@@ -379,7 +382,7 @@ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, w
 return;
 }
 supabase.channel(`rtc:${currentRoomId}`).on('postgres_changes',{
-event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.${currentRoomId}`
+event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.'${currentRoomId}'`
 },async (payload)=>{
 const sig = payload.new;
 if(sig.to_user !== currentUser.id) return;
@@ -545,7 +548,6 @@ async function joinByInvite() {
   currentInviteCode = inviteCode;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
-  // ========= 取消下面两行注释 =========
   subscribeChat();
   subscribeWebRTCSignal();
   alert("✅成功加入房间！现在可以发送聊天消息");
