@@ -571,20 +571,18 @@ async function joinByInvite() {
   console.log("joinByInvite 执行了");
   const inviteCode = document.getElementById("joinInviteInput").value.trim();
   console.log("拿到邀请码：", inviteCode);
-
   if (!inviteCode) {
     alert("请输入邀请码");
     return;
   }
   const { data, error } = await supabase
-    .from("rooms")  
+    .from("rooms")
     .select("*")
     .eq("invite_code", inviteCode)
     .single();
 
   if (error || !data) {
-    alert("邀请码错误，找不到房间");
-    console.error("加入房间失败", error);
+    alert("找不到该房间");
     return;
   }
 
@@ -594,13 +592,10 @@ async function joinByInvite() {
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
 
-  subscribeChat();
-  subscribeWebRTCSignal();
-
+  //subscribeChat();
+  //subscribeWebRTCSignal();
   alert("✅成功加入房间！现在可以发送聊天消息");
-// ←就在这一行的下面，新起一行写 }
 }
-//====================================
 </script>
 </body>
 </html>
