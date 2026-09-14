@@ -306,25 +306,27 @@ async function logout(){
 }
 // 房间
 async function createRoom(){
+  console.log("currentUser = ", currentUser);
   if(!supabase){
     return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
   }
   const code = genInviteCode();
-  const roomId = crypto.randomUUID();
-
   const {data, error}=await supabase.from("rooms").insert([{
-    id: roomId,
     owner:currentUser.id,
     invite_code:code,
     movie_url:"",
     play_status:"pause",
     is_private:privateRoomMode
   }]).select();
-
   if(error){
     console.error("创建房间失败",error);
     return alert(lang==="zh"?"创建房间失败":"Create room failed");
   }
+  currentRoomId = data[0].id;
+  currentInviteCode = code;
+  document.getElementById("showRoomId").innerText = currentRoomId;
+  document.getElementById("showInviteCode").innerText = currentInviteCode;
+}
 
   // 创建成功，保存房间信息
   currentRoomId = data[0].id;
