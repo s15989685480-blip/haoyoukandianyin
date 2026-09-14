@@ -201,7 +201,7 @@ return;
 }
 const chatChannel = supabase.channel(`chat:${currentRoomId}`);
 chatChannel.on('postgres_changes', {
-event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
+event:'INSERT', schema:'public', table:'messages_new', filter:`room_id=eq.${currentRoomId}`
 },(payload)=>{
 appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
@@ -400,8 +400,12 @@ async function sendChat(){
   };
 
   const {error} = await supabase
-    .from('messages')
-    .insert(payload, {
+    .from('messages_new')
+    .insert({
+      room_id: currentRoomId,
+      author: currentUser.username,
+      content: msg
+    }, {
       count:'none',
       returning:'minimal'
     });
