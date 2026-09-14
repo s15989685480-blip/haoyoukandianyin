@@ -393,22 +393,26 @@ async function sendChat(){
     return;
   }
 
-  try {
-    const { error } = await supabase.rpc("insert_chat_msg", {
-      p_room_id: currentRoomId,
-      p_author: currentUser.username,
-      p_content: msg
+  const payload = {
+    room_id: currentRoomId,
+    author: currentUser.username,
+    content: msg
+  };
+
+  const {error} = await supabase
+    .from('messages')
+    .insert(payload, {
+      count:'none',
+      returning:'minimal'
     });
-    if (error) {
-      console.error("🔴插入消息失败error详情：", error);
-      return;
-    }
-    // 清空输入框，删掉本地append，交给realtime回传渲染，避免消息重复
-    document.getElementById("chatInput").value = "";
-  } catch (err) {
-    console.error("sendChat异常", err);
+
+  if(error){
+    console.error("🔴插入消息失败error详情：", error);
+    return;
   }
+  document.getElementById("chatInput").value = "";
 }
+
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
   if (!box) return;
