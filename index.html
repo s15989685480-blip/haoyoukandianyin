@@ -567,7 +567,39 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 }
 await supabase.from("friends").update({status:"reject"}).eq("id",rowId);
 loadFriendList();
+async function joinByInvite() {
+  console.log("joinByInvite 执行了");
+  const inviteCode = document.getElementById("joinInviteInput").value.trim();
+  console.log("拿到邀请码：", inviteCode);
+
+  if (!inviteCode) {
+    alert("请输入邀请码");
+    return;
+  }
+  const { data, error } = await supabase
+    .from("rooms")  
+    .select("*")
+    .eq("invite_code", inviteCode)
+    .single();
+
+  if (error || !data) {
+    alert("邀请码错误，找不到房间");
+    console.error("加入房间失败", error);
+    return;
+  }
+
+  currentRoomId = data.id;
+  currentInviteCode = inviteCode;
+
+  document.getElementById("showRoomId").innerText = currentRoomId;
+  document.getElementById("showInviteCode").innerText = currentInviteCode;
+
+  subscribeChat();
+  subscribeWebRTCSignal();
+
+  alert("✅成功加入房间！现在可以发送聊天消息");
 }
+//====================================
 </script>
 </body>
 </html>
