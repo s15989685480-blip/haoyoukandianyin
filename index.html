@@ -4,7 +4,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>SyncWatch | 同步观影视频聊天室</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<!-- 【重点】删掉原来supabase的script！ -->
 <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
 <style>
@@ -215,41 +214,6 @@ document.querySelectorAll("[data-placeholder-zh]").forEach(input=>{
 input.placeholder = lang==="zh"?input.dataset.placeholderZh:input.dataset.placeholderEn;
 })
 }
-// ========= Supabase数据库表建议（需要你在Supabase后台手动建立4张表） =========
-/*
-表1: users
-id uuid primary key
-username text unique
-password text
-created_at timestamp
-is_online boolean default false
-表2: friends
-id uuid primary key
-user_id uuid
-friend_id uuid
-status text (pending/accept/reject)
-表3: rooms
-id uuid primary key
-owner uuid
-invite_code text unique
-movie_url text
-play_status text
-is_private boolean default false
-created_at timestamp
-表4: chat_messages
-id uuid primary key
-room_id uuid
-sender text
-msg text
-created_at timestamp
-表5: webrtc_signals
-id uuid primary key
-room_id uuid
-from_user uuid
-to_user uuid
-signal jsonb
-created_at timestamp
-*/
 // 生成6位邀请码
 function genInviteCode(){
 return Math.random().toString(36).substring(2,8).toUpperCase();
@@ -306,7 +270,6 @@ async function createRoom(){
   }
   const code = genInviteCode();
   const roomId = crypto.randomUUID();
-
   const {data, error}=await supabase.from("rooms").insert([{
     id: roomId,
     owner:currentUser.id,
@@ -315,19 +278,15 @@ async function createRoom(){
     play_status:"pause",
     is_private:privateRoomMode
   }]).select();
-
   if(error){
     console.error("创建房间失败",error);
     return alert(lang==="zh"?"创建房间失败":"Create room failed");
   }
-
-  // 创建成功，保存房间信息
   currentRoomId = data[0].id;
   currentInviteCode = code;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
 }
-
 // 创建一对一私聊房间
 async function createPrivateRoom(){
 if(!supabase){
@@ -343,9 +302,7 @@ if(!kw) return;
 const resultBox = document.getElementById("movieResultList");
 resultBox.classList.remove("hidden");
 resultBox.innerHTML = "";
-// 打开谷歌搜索
 window.open(`https://www.google.com/search?q=${encodeURIComponent(kw+" movie watch online")}`,"_blank");
-// 模拟两条结果，实际项目可对接搜索API
 const mockItems = [
 {title: kw+" - Public Demo Source", url:""},
 {title: kw+" Trailer", url:""}
@@ -355,7 +312,7 @@ const div = document.createElement("div");
 div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
 div.innerText = item.title;
 div.onclick=()=>{
-const promptUrl = prompt(lang==="zh","粘贴公开iframe播放地址","Paste public iframe url");
+const promptUrl = prompt(lang==="zh"?"粘贴公开iframe播放地址":"Paste public iframe url");
 if(promptUrl){
 document.getElementById("moviePlayer").src = promptUrl;
 }
@@ -408,7 +365,7 @@ async function sendChat(){
 }
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
-  if (!box) return; // 找不到聊天容器直接退出，不报错中断脚本
+  if (!box) return;
   const div = document.createElement("div");
   const timeStr = time ? new Date(time).toLocaleTimeString() : "";
   div.innerHTML = `<span class="text-indigo-300">${name}</span> <span class="text-xs text-slate-400">${timeStr}</span>: ${text}`;
@@ -473,7 +430,6 @@ async function startLocalVideo(){
 try{
 localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
 renderLocalVideo(localStream);
-// 通知房间内其他人建立连接
 }catch(e){alert(lang==="zh"?"获取摄像头失败":"Camera access denied");console.error(e)}
 }
 function stopLocalVideo(){
@@ -568,7 +524,6 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 await supabase.from("friends").update({status:"reject"}).eq("id",rowId);
 loadFriendList();
 }
-
 async function joinByInvite() {
   console.log("joinByInvite 执行了");
   const inviteCode = document.getElementById("joinInviteInput").value.trim();
@@ -597,3 +552,4 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
