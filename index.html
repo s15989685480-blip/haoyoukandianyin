@@ -160,18 +160,21 @@
 </div>
 
 <script>
-// ====================== 【请修改这里填入你的Supabase云端项目配置】 =====================
-const SUPABASE_URL = "https://udmexrwaacjapoicvsfz.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_u49G3mGU6cekwMlgV5Yc8w_xFUIkUVO";
-var supabase = null;
-try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("✅OK", supabase);
-} catch(e) {
-    console.error("❌真实原因", e && e.message, e);
+async function registerUser(){
+    // 新增这一行！
+    if(!supabase){
+        return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+    }
+    const uname = document.getElementById("usernameInput").value.trim();
+    const pwd = document.getElementById("pwdInput").value.trim();
+    if(!uname||!pwd) return alert(lang==="zh"?"用户名密码不能为空":"Username & password required");
+    const {data,error}=await supabase.from("users").insert([{username:uname,password:pwd,is_online:true}]).select();
+    if(error) return alert(error.message);
+    alert(lang==="zh"?"注册成功":"Register success");
+    currentUser = data[0];
+    showMain();
 }
 
-// =====================================================================================
 
 // 全局状态
 let currentUser = null;
