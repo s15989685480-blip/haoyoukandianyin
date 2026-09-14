@@ -389,11 +389,26 @@ async function sendChat(){
   const msg = document.getElementById("chatInput").value.trim();
   console.log("msg内容：", msg);
   console.log("currentRoomId：", currentRoomId);
-  if(!msg||!currentRoomId) return;
-  await supabase.from("messages").insert([{
-    room_id:currentRoomId, sender:currentUser.username, msg:msg
+  if(!msg || !currentRoomId || msg.length === 0){
+    return;
+  }
+
+  const {error} = await supabase.from("messages").insert([{
+    room_id: currentRoomId,
+    sender: currentUser.username,
+    msg: msg
   }]);
-  document.getElementById("chatInput").value="";
+
+  //打印完整的Supabase400错误详情，这是最重要的
+  if(error){
+    console.error("🔴插入消息失败error详情：", error);
+  }
+
+  //兜底：不管数据库成功失败，本地页面都显示自己发出的消息（别人看不到，仅调试）
+  appendChat(currentUser.username, msg, new Date());
+
+  //清空输入框
+  document.getElementById("chatInput").value = "";
 }
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
