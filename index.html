@@ -203,7 +203,7 @@ const chatChannel = supabase.channel(`chat:${currentRoomId}`);
 chatChannel.on('postgres_changes', {
 event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
 },(payload)=>{
-appendChat(payload.new.sender, payload.new.content, payload.new.created_at);
+appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
 }
@@ -395,21 +395,18 @@ async function sendChat(){
 
   const {error} = await supabase.from("messages").insert([{
     room_id: currentRoomId,
-    sender: currentUser.username,
-    content: msg   // ← 原来写的 msg:msg，现在改成content:msg
-}]);
+    author: currentUser.username,
+    content: msg
+  }]);
 
-  //打印完整的Supabase400错误详情，这是最重要的
   if(error){
     console.error("🔴插入消息失败error详情：", error);
   }
 
-  //兜底：不管数据库成功失败，本地页面都显示自己发出的消息（别人看不到，仅调试）
   appendChat(currentUser.username, msg, new Date());
-
-  //清空输入框
   document.getElementById("chatInput").value = "";
 }
+
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
   if (!box) return;
