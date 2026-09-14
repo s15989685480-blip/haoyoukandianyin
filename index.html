@@ -545,8 +545,9 @@ async function joinByInvite() {
   currentInviteCode = inviteCode;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
-  //subscribeChat();
-  //subscribeWebRTCSignal();
+  // ========= 取消下面两行注释 =========
+  subscribeChat();
+  subscribeWebRTCSignal();
   alert("✅成功加入房间！现在可以发送聊天消息");
 }
 </script>
