@@ -252,6 +252,7 @@ async function logout(){
 if(!supabase){
 return;
 }
+supabase.removeAllChannels();
 if(currentUser){
 await supabase.from("users").update({is_online:false}).eq("id",currentUser.id);
 }
@@ -268,6 +269,7 @@ async function createRoom(){
   if(!supabase){
     return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
   }
+  supabase.removeAllChannels();
   const code = genInviteCode();
   const roomId = crypto.randomUUID();
   const {data, error}=await supabase.from("rooms").insert([{
@@ -286,7 +288,6 @@ async function createRoom(){
   currentInviteCode = code;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
-  // ✅新增：创建房间后自动开启聊天和WebRTC监听
   subscribeChat();
   subscribeWebRTCSignal();
 }
@@ -349,7 +350,7 @@ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, w
 return;
 }
 supabase.channel(`chat:${currentRoomId}`).on('postgres_changes', {
-event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.'${currentRoomId}'`
+event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
 },(payload)=>{
 appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
 }).subscribe();
@@ -382,7 +383,7 @@ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, w
 return;
 }
 supabase.channel(`rtc:${currentRoomId}`).on('postgres_changes',{
-event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.'${currentRoomId}'`
+event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.${currentRoomId}`
 },async (payload)=>{
 const sig = payload.new;
 if(sig.to_user !== currentUser.id) return;
@@ -535,6 +536,7 @@ async function joinByInvite() {
     alert("请输入邀请码");
     return;
   }
+  supabase.removeAllChannels();
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
@@ -555,4 +557,5 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
 
