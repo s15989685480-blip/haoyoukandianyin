@@ -395,6 +395,7 @@ appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
 }).subscribe();
 }
 async function sendChat(){
+  console.log("sendChat被调用");
   const msg = document.getElementById("chatInput").value.trim();
   if(!msg||!currentRoomId) return;
   await supabase.from("chat_messages").insert([{
