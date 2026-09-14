@@ -397,11 +397,12 @@ appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
 async function sendChat(){
   console.log("sendChat被调用");
   const msg = document.getElementById("chatInput").value.trim();
+  console.log("msg内容：", msg);
+  console.log("currentRoomId：", currentRoomId);
   if(!msg||!currentRoomId) return;
   await supabase.from("chat_messages").insert([{
     room_id:currentRoomId, sender:currentUser.username, msg:msg
   }]);
-  //新增这一行，本地立刻渲染自己发送的消息
   appendChat(currentUser.username, msg, new Date());
   document.getElementById("chatInput").value="";
 }
