@@ -186,6 +186,46 @@ let localStream = null;
 let peers = {};
 let lang = "zh";
 let privateRoomMode = false;
+
+// ========== 新增工具函数 ==========
+async function clearAllChannelsWait(){
+    supabase.removeAllChannels();
+    await new Promise(resolve=>setTimeout(resolve,250));
+}
+
+// 聊天订阅实时监听
+async function subscribeChat(){
+if(!supabase){
+alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+return;
+}
+const chatChannel = supabase.channel(`chat:${currentRoomId}`);
+chatChannel.on('postgres_changes', {
+event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
+},(payload)=>{
+appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
+});
+chatChannel.subscribe();
+}
+
+// ========= WebRTC信令实时订阅 =========
+async function subscribeWebRTCSignal(){
+if(!supabase){
+alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+return;
+}
+const rtcChannel = supabase.channel(`rtc:${currentRoomId}`);
+rtcChannel.on('postgres_changes',{
+event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.${currentRoomId}`
+},async (payload)=>{
+const sig = payload.new;
+if(sig.to_user !== currentUser.id) return;
+await handleSignal(sig.from_user, sig.signal);
+});
+rtcChannel.subscribe();
+}
+// =================================
+
 // 双语字典（新增词条）
 const i18n = {
 zh:{
@@ -252,7 +292,7 @@ async function logout(){
 if(!supabase){
 return;
 }
-supabase.removeAllChannels();
+await clearAllChannelsWait();
 if(currentUser){
 await supabase.from("users").update({is_online:false}).eq("id",currentUser.id);
 }
@@ -269,7 +309,7 @@ async function createRoom(){
   if(!supabase){
     return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
   }
-  supabase.removeAllChannels();
+  await clearAllChannelsWait();
   const code = genInviteCode();
   const roomId = crypto.randomUUID();
   const {data, error}=await supabase.from("rooms").insert([{
@@ -288,8 +328,8 @@ async function createRoom(){
   currentInviteCode = code;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
-  subscribeChat();
-  subscribeWebRTCSignal();
+  await subscribeChat();
+  await subscribeWebRTCSignal();
 }
 // 创建一对一私聊房间
 async function createPrivateRoom(){
@@ -343,18 +383,7 @@ await supabase.from("rooms").update({play_status:"pause"}).eq("id",currentRoomId
 async function clearChat(){
 document.getElementById("chatBox").innerHTML="";
 }
-// 聊天订阅实时监听
-function subscribeChat(){
-if(!supabase){
-alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-return;
-}
-supabase.channel(`chat:${currentRoomId}`).on('postgres_changes', {
-event:'INSERT', schema:'public', table:'messages', filter:`room_id=eq.${currentRoomId}`
-},(payload)=>{
-appendChat(payload.new.sender,payload.new.msg, payload.new.created_at);
-}).subscribe();
-}
+
 async function sendChat(){
   console.log("sendChat被调用");
   const msg = document.getElementById("chatInput").value.trim();
@@ -364,7 +393,6 @@ async function sendChat(){
   await supabase.from("messages").insert([{
     room_id:currentRoomId, sender:currentUser.username, msg:msg
   }]);
-  appendChat(currentUser.username, msg, new Date());
   document.getElementById("chatInput").value="";
 }
 function appendChat(name,text,time){
@@ -376,20 +404,7 @@ function appendChat(name,text,time){
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
-// ========= WebRTC信令实时订阅 =========
-function subscribeWebRTCSignal(){
-if(!supabase){
-alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-return;
-}
-supabase.channel(`rtc:${currentRoomId}`).on('postgres_changes',{
-event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.${currentRoomId}`
-},async (payload)=>{
-const sig = payload.new;
-if(sig.to_user !== currentUser.id) return;
-await handleSignal(sig.from_user, sig.signal);
-}).subscribe();
-}
+
 async function sendSignal(toUserId, signalObj){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -536,7 +551,7 @@ async function joinByInvite() {
     alert("请输入邀请码");
     return;
   }
-  supabase.removeAllChannels();
+  await clearAllChannelsWait();
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
@@ -550,12 +565,10 @@ async function joinByInvite() {
   currentInviteCode = inviteCode;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
-  subscribeChat();
-  subscribeWebRTCSignal();
+  await subscribeChat();
+  await subscribeWebRTCSignal();
   alert("✅成功加入房间！现在可以发送聊天消息");
 }
 </script>
 </body>
 </html>
-
-
