@@ -186,16 +186,14 @@ let localStream = null;
 let peers = {};
 let lang = "zh";
 let privateRoomMode = false;
-
+let isRoomOwner = false;
 // =========新增WebRTC全局变量=========
 let signalSub = null;
-
 // ========== 新增工具函数 ==========
 async function clearAllChannelsWait(){
     supabase.removeAllChannels();
     await new Promise(resolve=>setTimeout(resolve,250));
 }
-
 // 聊天订阅实时监听
 async function subscribeChat(){
 if(!supabase){
@@ -210,80 +208,62 @@ appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
 }
-
 // ========= WebRTC信令实时订阅 表名 webrtc_signals =========
 async function subscribeWebRTCSignal(){
+console.log("🔔 WebRTC订阅函数开始执行");
 if(!supabase){
 alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 return;
 }
 const rtcChannel = supabase.channel(`rtc:${currentRoomId}`);
 rtcChannel.on('postgres_changes',{
-event:"INSERT",schema:"public",table:"webrtc_signals",filter:`room_id=eq.${currentRoomId}`
+event:"INSERT",
+schema:"public",
+table:"webrtc_signals"
 },async (payload)=>{
-console.log("📩收到webrtc信令",payload.new);
 const sig = payload.new;
-if(sig.to_user !== currentUser.id) return;
-await handleSignal(sig.from_user, sig.signal);
+if(sig.from_user === currentUser.id) return;
+console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
+const remoteKey = "peer-1";
+if(!peers[remoteKey] && localStream){
+peers[remoteKey] = new SimplePeer({initiator:false, trickle:false, stream:localStream});
+setupPeerEvents(peers[remoteKey], remoteKey);
+}
+if(peers[remoteKey]){
+peers[remoteKey].signal(sig.signal);
+}
 });
 rtcChannel.subscribe();
 signalSub = rtcChannel;
 }
 
-// Simple‑Peer初始化函数 initPeerConnection
-/**
- * isInitiator true=创建房间的人(A), false=加入房间(B)
- */
-function initPeerConnection(isInitiator){
-  if(!localStream){
-    console.warn("请先打开摄像头！");
-    return;
-  }
-  // 只处理一对一，简单处理：没有远端peer就创建
+async function sendSignal(signalObj){
+  if(!supabase || !currentRoomId) return;
+  await supabase.from("webrtc_signals").insert([{
+    room_id: currentRoomId,
+    from_user: currentUser.id,
+    to_user: '00000000-0000-0000-0000-000000000000',
+    signal: signalObj
+  }]);
 }
 
-async function sendSignal(toUserId, signalObj){
-if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-}
-await supabase.from("webrtc_signals").insert([{
-room_id:currentRoomId,
-from_user:currentUser.id,
-to_user:toUserId,
-signal:signalObj
-}]);
-}
-
-async function handleSignal(fromUid, signal){
-console.log("handleSignal 处理信令 from:",fromUid);
-if(!peers[fromUid]){
-peers[fromUid] = new SimplePeer({
-initiator:false,
-trickle:false,
-stream:localStream
-});
-setupPeerEvents(peers[fromUid], fromUid);
-}
-peers[fromUid].signal(signal);
-}
-
-function setupPeerEvents(peer, remoteUid){
+function setupPeerEvents(peer, remoteKey){
 peer.on("signal", (sig)=>{
-console.log("📤发送信令给",remoteUid);
-sendSignal(remoteUid, sig);
+console.log("📤发送信令");
+sendSignal(sig);
 });
 peer.on("stream", (remoteStream)=>{
-console.log("✅拿到远端视频流");
-renderRemoteVideo(remoteStream, remoteUid);
+console.log("✅拿到远端视频流！");
+renderRemoteVideo(remoteStream, remoteKey);
 });
 peer.on("close",()=>{
-removeRemoteVideo(remoteUid);
-delete peers[remoteUid];
+removeRemoteVideo(remoteKey);
+delete peers[remoteKey];
 });
 peer.on("error",(err)=>{
 console.error("peer error",err);
-removeRemoteVideo(remoteUid);
-delete peers[remoteUid];
+removeRemoteVideo(remoteKey);
+delete peers[remoteKey];
 })
 }
 
@@ -305,7 +285,6 @@ closeCam:"Close Camera",mic:"Mic",chatRoom:"Room Chat",friendList:"Friend List",
 joinRoom:"Join",roomId:"Room ID",inviteCode:"Invite Code",clearChat:"Clear Chat",oneOnOne:"1‑to‑1 Chat"
 }
 };
-
 // 切换语言
 function switchLang(){
 lang = document.getElementById("langSelect").value;
@@ -317,12 +296,10 @@ document.querySelectorAll("[data-placeholder-zh]").forEach(input=>{
 input.placeholder = lang==="zh"?input.dataset.placeholderZh:input.dataset.placeholderEn;
 })
 }
-
 // 生成6位邀请码
 function genInviteCode(){
 return Math.random().toString(36).substring(2,8).toUpperCase();
 }
-
 // 用户登录注册
 async function registerUser(){
 if(!supabase){
@@ -337,7 +314,6 @@ alert(lang==="zh"?"注册成功":"Register success");
 currentUser = data[0];
 showMain();
 }
-
 async function loginUser(){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -350,12 +326,10 @@ currentUser = data;
 await supabase.from("users").update({is_online:true}).eq("id",currentUser.id);
 showMain();
 }
-
 function showMain(){
 document.getElementById("authModal").classList.add("hidden");
 document.getElementById("mainPage").classList.remove("hidden");
 }
-
 async function logout(){
 if(!supabase){
 return;
@@ -370,13 +344,11 @@ currentInviteCode=null;
 localStream=null;
 Object.values(peers).forEach(p=>p.destroy?.());
 peers={};
-
 document.getElementById("showRoomId").innerText="-";
 document.getElementById("showInviteCode").innerText="-";
 document.getElementById("authModal").classList.remove("hidden");
 document.getElementById("mainPage").classList.add("hidden");
 }
-
 // 房间 创建房间（A，发起方 initiator:true）
 async function createRoom(){
   if(!supabase){
@@ -399,12 +371,12 @@ async function createRoom(){
   }
   currentRoomId = data[0].id;
   currentInviteCode = code;
+  isRoomOwner = true;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
   await subscribeChat();
   await subscribeWebRTCSignal();
 }
-
 // 创建一对一私聊房间
 async function createPrivateRoom(){
 if(!supabase){
@@ -413,7 +385,6 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 privateRoomMode = true;
 await createRoom();
 }
-
 // 电影搜索（谷歌搜索，模拟结果列表）
 function searchMovie(){
 const kw = document.getElementById("movieSearch").value.trim();
@@ -439,7 +410,6 @@ document.getElementById("moviePlayer").src = promptUrl;
 resultBox.appendChild(div);
 })
 }
-
 // 播放同步
 async function playSync(){
 if(!supabase){
@@ -448,7 +418,6 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 if(!currentRoomId) return;
 await supabase.from("rooms").update({play_status:"play"}).eq("id",currentRoomId);
 }
-
 async function pauseSync(){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -456,12 +425,10 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 if(!currentRoomId) return;
 await supabase.from("rooms").update({play_status:"pause"}).eq("id",currentRoomId);
 }
-
 // 清空聊天
 async function clearChat(){
 document.getElementById("chatBox").innerHTML="";
 }
-
 async function sendChat(){
   console.log("sendChat被调用");
   const msg = document.getElementById("chatInput").value.trim();
@@ -491,7 +458,6 @@ async function sendChat(){
   }
   document.getElementById("chatInput").value = "";
 }
-
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
   if (!box) return;
@@ -501,19 +467,24 @@ function appendChat(name,text,time){
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
-
 // 摄像头 Simple‑Peer版本
 async function startLocalVideo() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     renderLocalVideo(localStream);
     console.log("✅本地摄像头打开成功");
+    const remoteKey = "peer-1";
+    if(!peers[remoteKey]){
+      const isInitiator = !isRoomOwner;
+      peers[remoteKey] = new SimplePeer({initiator:isInitiator, trickle:false, stream:localStream});
+      setupPeerEvents(peers[remoteKey], remoteKey);
+      console.log("P2P角色 initiator:", isInitiator);
+    }
   } catch(err) {
     alert(lang==="zh"?"获取摄像头失败":"Camera access denied");
     console.error(err);
   }
 }
-
 function stopLocalVideo(){
   if(localStream){
     localStream.getTracks().forEach(t=>t.stop());
@@ -527,7 +498,6 @@ function stopLocalVideo(){
   const localDom = document.getElementById("vid-local");
   if(localDom) localDom.remove();
 }
-
 function renderLocalVideo(stream){
 const container = document.getElementById("videoContainer");
 const div = document.createElement("div");
@@ -537,7 +507,6 @@ div.innerHTML = `<video autoplay muted playsinline></video>`;
 div.querySelector("video").srcObject = stream;
 container.appendChild(div);
 }
-
 function renderRemoteVideo(stream,uid){
 if(document.getElementById("vid-"+uid)) return;
 const container = document.getElementById("videoContainer");
@@ -551,7 +520,6 @@ div.innerHTML = `
 div.querySelector("video").srcObject = stream;
 container.appendChild(div);
 }
-
 function removeRemoteVideo(uid){
 const el = document.getElementById("vid-"+uid);
 if(el) el.remove();
@@ -560,17 +528,14 @@ peers[uid].destroy();
 delete peers[uid];
 }
 }
-
 function toggleAudio(){
 if(!localStream)return;
 const audioTrack = localStream.getAudioTracks()[0];
 audioTrack.enabled = !audioTrack.enabled;
 }
-
 // 好友面板
 function openFriendPanel(){document.getElementById("friendModal").classList.remove("hidden");loadFriendList();}
 function closeFriendPanel(){document.getElementById("friendModal").classList.add("hidden");}
-
 async function loadFriendList(){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -597,7 +562,6 @@ div.innerHTML = `<div>${onlineMark} ${f.username}</div><div>${btns}</div>`;
 dom.appendChild(div);
 })
 }
-
 async function sendFriendReq(){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -609,7 +573,6 @@ await supabase.from("friends").insert([{user_id:currentUser.id,friend_id:data.id
 alert(lang==="zh"?"好友请求已发送":"Friend request sent");
 loadFriendList();
 }
-
 async function acceptFriend(rowId){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -617,7 +580,6 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 await supabase.from("friends").update({status:"accept"}).eq("id",rowId);
 loadFriendList();
 }
-
 async function rejectFriend(rowId){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -625,7 +587,6 @@ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loa
 await supabase.from("friends").update({status:"reject"}).eq("id",rowId);
 loadFriendList();
 }
-
 // 加入房间
 async function joinByInvite() {
   console.log("joinByInvite 执行了");
@@ -647,6 +608,7 @@ async function joinByInvite() {
   }
   currentRoomId = data.id;
   currentInviteCode = inviteCode;
+  isRoomOwner = (data.owner === currentUser.id);
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
   await subscribeChat();
@@ -656,3 +618,4 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
