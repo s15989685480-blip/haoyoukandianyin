@@ -479,7 +479,7 @@ async function createPrivateRoomByFriend(friendUserName){
   privateRoomMode = false;
   privateSelectMode = false;
 }
-// ✅修复后搜索函数：点击搜索只渲染下方列表，不会立刻打开谷歌；点击条目才可选打开谷歌
+// ✅修复搜索：点击条目只加载播放器，不会跳转谷歌
 function searchMovie(){
 console.log("搜索按钮点击触发");
 const kw = document.getElementById("movieSearch").value.trim();
@@ -500,10 +500,8 @@ setTimeout(()=>{
    div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
    div.innerText = item.title;
    div.onclick=()=>{
-      // 点击条目，直接加载iframe到播放器
+      // 仅加载iframe，删除谷歌跳转
       document.getElementById("moviePlayer").src = item.url;
-      // 如果你需要，点击条目时才打开谷歌新标签
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(item.searchGoogle+" movie watch online")}`,"_blank");
    };
    resultBox.appendChild(div);
   })
@@ -760,4 +758,5 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
 
