@@ -474,18 +474,16 @@ resultBox.classList.remove("hidden");
 resultBox.innerHTML = "";
 window.open(`https://www.google.com/search?q=${encodeURIComponent(kw+" movie watch online")}`,"_blank");
 const mockItems = [
- {title: kw+" - Public Demo Source", url:""},
- {title: kw+" Trailer", url:""}
+ {title: kw+" - Public Demo Source", url:"https://example-demo-iframe-url.com/embed"},
+ {title: kw+" Trailer", url:"https://example-trailer-iframe-url.com/embed"}
 ];
 mockItems.forEach(item=>{
  const div = document.createElement("div");
  div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
  div.innerText = item.title;
  div.onclick=()=>{
- const promptUrl = prompt(lang==="zh"?"粘贴公开iframe播放地址":"Paste public iframe url");
- if(promptUrl){
- document.getElementById("moviePlayer").src = promptUrl;
- }
+    // 点击条目，直接加载iframe到播放器
+    document.getElementById("moviePlayer").src = item.url;
  };
  resultBox.appendChild(div);
  })
@@ -504,7 +502,6 @@ if(error){
   alert(lang==="zh"?"同步失败："+error.message:"Sync failed: "+error.message);
 }
 }
-
 async function pauseSync(){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -742,4 +739,5 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
 
