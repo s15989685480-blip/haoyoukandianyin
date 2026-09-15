@@ -186,13 +186,19 @@ let localStream = null;
 let peers = {};
 let lang = "zh";
 let privateRoomMode = false;
-
+// =========新增WebRTC全局变量=========
+let pc = null;
+let signalSub = null;
+const peerConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+  ]
+};
 // ========== 新增工具函数 ==========
 async function clearAllChannelsWait(){
     supabase.removeAllChannels();
     await new Promise(resolve=>setTimeout(resolve,250));
 }
-
 // 聊天订阅实时监听
 async function subscribeChat(){
 if(!supabase){
@@ -207,7 +213,6 @@ appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
 }
-
 // ========= WebRTC信令实时订阅 =========
 async function subscribeWebRTCSignal(){
 if(!supabase){
@@ -225,7 +230,6 @@ await handleSignal(sig.from_user, sig.signal);
 rtcChannel.subscribe();
 }
 // =================================
-
 // 双语字典（新增词条）
 const i18n = {
 zh:{
@@ -383,7 +387,6 @@ await supabase.from("rooms").update({play_status:"pause"}).eq("id",currentRoomId
 async function clearChat(){
 document.getElementById("chatBox").innerHTML="";
 }
-
 async function sendChat(){
   console.log("sendChat被调用");
   const msg = document.getElementById("chatInput").value.trim();
@@ -392,13 +395,11 @@ async function sendChat(){
   if(!msg || !currentRoomId || msg.length === 0){
     return;
   }
-
   const payload = {
     room_id: currentRoomId,
     author: currentUser.username,
     content: msg
   };
-
   const {error} = await supabase
     .from('messages_new')
     .insert({
@@ -409,14 +410,12 @@ async function sendChat(){
       count:'none',
       returning:'minimal'
     });
-
   if(error){
     console.error("🔴插入消息失败error详情：", error);
     return;
   }
   document.getElementById("chatInput").value = "";
 }
-
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
   if (!box) return;
@@ -426,7 +425,6 @@ function appendChat(name,text,time){
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
-
 async function sendSignal(toUserId, signalObj){
 if(!supabase){
 return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
@@ -466,15 +464,97 @@ removeRemoteVideo(remoteUid);
 delete peers[remoteUid];
 })
 }
-// WebRTC视频
-async function startLocalVideo(){
-try{
-localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-renderLocalVideo(localStream);
-}catch(e){alert(lang==="zh"?"获取摄像头失败":"Camera access denied");console.error(e)}
+// WebRTC视频【已替换新版startLocalVideo】
+async function startLocalVideo() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    renderLocalVideo(localStream);
+
+    pc = new RTCPeerConnection(peerConfig);
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+    // 接收对方视频流
+    pc.ontrack = (event) => {
+      console.log("✅收到对方远端流");
+      const remoteStream = event.streams[0];
+      let remoteVideo = document.getElementById("remoteVideo");
+      if (!remoteVideo) {
+        const div = document.createElement("div");
+        div.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:240px;border:2px solid #818cf8;"></video>`;
+        document.querySelector(".video-box").appendChild(div);
+      }
+      document.getElementById("remoteVideo").srcObject = remoteStream;
+    };
+
+    pc.addEventListener("iceconnectionstatechange", ()=>{
+      console.log("🔗ICE状态", pc.iceConnectionState);
+    });
+
+    pc.onicecandidate = async (e) => {
+      if (!e.candidate) return;
+      await supabase.from("rtc_signals").insert({
+        room_id: currentRoomId,
+        from_user: currentUser.username,
+        signal: e.candidate
+      });
+    };
+
+    // 订阅信令
+    if(signalSub) signalSub.unsubscribe();
+    signalSub = supabase.channel(`rtc:${currentRoomId}`)
+    .on("postgres_changes",{
+      event:"INSERT",
+      schema:"public",
+      table:"rtc_signals",
+      filter:`room_id=eq.${currentRoomId}`
+    },async (payload)=>{
+      const sig = payload.new.signal;
+      if(payload.new.from_user === currentUser.username) return;
+
+      if(sig.type === "offer"){
+        await pc.setRemoteDescription(new RTCSessionDescription(sig));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await supabase.from("rtc_signals").insert({
+          room_id: currentRoomId,
+          from_user: currentUser.username,
+          signal: answer
+        });
+      }else if(sig.type === "answer"){
+        await pc.setRemoteDescription(new RTCSessionDescription(sig));
+      }else if(sig.candidate){
+        await pc.addIceCandidate(new RTCIceCandidate(sig));
+      }
+    }).subscribe();
+
+    // 发送offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await supabase.from("rtc_signals").insert({
+      room_id: currentRoomId,
+      from_user: currentUser.username,
+      signal: offer
+    });
+
+  } catch(err) {
+    alert(lang==="zh"?"获取摄像头失败":"Camera access denied");
+    console.error(err);
+  }
 }
+// 【已替换新版stopLocalVideo】
 function stopLocalVideo(){
-if(localStream) localStream.getTracks().forEach(t=>t.stop());
+  if(localStream){
+    localStream.getTracks().forEach(t=>t.stop());
+    localStream = null;
+  }
+  if(pc){
+    pc.close();
+    pc = null;
+  }
+  if(signalSub) signalSub.unsubscribe();
+
+  const rv = document.getElementById("remoteVideo");
+  if(rv) rv.remove();
 }
 function renderLocalVideo(stream){
 const container = document.getElementById("videoContainer");
