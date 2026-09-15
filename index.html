@@ -55,6 +55,15 @@ aspect-ratio:16/9; background:#000;
   margin-top:3px;
   display:block;
 }
+/* 搜索loading云朵样式 */
+.movie-loading{
+  min-height:200px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#94a3b8;
+  font-size:40px;
+}
 </style>
 </head>
 <body class="min-h-screen">
@@ -103,7 +112,8 @@ aspect-ratio:16/9; background:#000;
 <i class="fa fa-search absolute left-3 top-2.5 text-gray-400"></i>
 <input id="movieSearch" placeholder="🔍 搜索电影 Search movie..." class="w-full pl-9 p-2 rounded bg-slate-800 border border-slate-700">
 </div>
-<button onclick="searchMovie()" class="bg-indigo-500 px-4 rounded"><i class="fa fa-google"></i> <span data-i18n="search">搜索</span></button>
+<!-- ✅ 修改：增加 type="button"，阻止表单跳转 -->
+<button type="button" onclick="searchMovie()" class="bg-indigo-500 px-4 rounded"><i class="fa fa-google"></i> <span data-i18n="search">搜索</span></button>
 </div>
 <div id="movieResultList" class="bg-slate-800 rounded mb-2 max-h-32 overflow-y-auto hidden"></div>
 <div class="room-screen rounded-lg overflow-hidden border border-slate-700">
@@ -466,27 +476,36 @@ async function createPrivateRoomByFriend(friendUserName){
   privateRoomMode = false;
   privateSelectMode = false;
 }
+// ✅ 修改后的搜索函数，增加loading，不会直接跳转谷歌
 function searchMovie(){
+console.log("搜索按钮点击触发");
 const kw = document.getElementById("movieSearch").value.trim();
 if(!kw) return;
 const resultBox = document.getElementById("movieResultList");
 resultBox.classList.remove("hidden");
-resultBox.innerHTML = "";
+// 显示loading云朵
+resultBox.innerHTML = `<div class="movie-loading"><i class="fa fa-cloud"></i></div>`;
+
+// 模拟加载延迟
+setTimeout(()=>{
+  const mockItems = [
+   {title: kw+" - Public Demo Source", url:"https://example-demo-iframe-url.com/embed"},
+   {title: kw+" Trailer", url:"https://example-trailer-iframe-url.com/embed"}
+  ];
+  resultBox.innerHTML = "";
+  mockItems.forEach(item=>{
+   const div = document.createElement("div");
+   div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
+   div.innerText = item.title;
+   div.onclick=()=>{
+      // 点击条目，直接加载iframe到播放器
+      document.getElementById("moviePlayer").src = item.url;
+   };
+   resultBox.appendChild(div);
+  })
+}, 600);
+// 在新标签打开谷歌搜索（不再劫持当前页面）
 window.open(`https://www.google.com/search?q=${encodeURIComponent(kw+" movie watch online")}`,"_blank");
-const mockItems = [
- {title: kw+" - Public Demo Source", url:"https://example-demo-iframe-url.com/embed"},
- {title: kw+" Trailer", url:"https://example-trailer-iframe-url.com/embed"}
-];
-mockItems.forEach(item=>{
- const div = document.createElement("div");
- div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
- div.innerText = item.title;
- div.onclick=()=>{
-    // 点击条目，直接加载iframe到播放器
-    document.getElementById("moviePlayer").src = item.url;
- };
- resultBox.appendChild(div);
- })
 }
 async function playSync(){
 if(!supabase){
@@ -739,5 +758,4 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
-
 
