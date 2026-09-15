@@ -125,7 +125,7 @@ aspect-ratio:16/9; background:#000;
 <button onclick="startLocalVideo()" class="bg-blue-600 px-3 py-1 rounded text-sm"><i class="fa fa-video-camera"></i> <span data-i18n="openCam">开启摄像头</span></button>
 <button onclick="stopLocalVideo()" class="bg-slate-600 px-3 py-1 rounded text-sm"><i class="fa fa-video-camera"></i> <span data-i18n="closeCam">关闭摄像头</span></button>
 <button onclick="toggleAudio()" class="bg-slate-600 px-3 py-1 rounded text-sm"><i class="fa fa-microphone"></i> <span data-i18n="mic">麦克风</span></button>
-<button onclick="createPrivateRoom()" class="bg-pink-600 px-3 py-1 rounded text-sm"><i class="fa fa-user"></i> <span data-i18n="oneOnOne">一对一私聊</span></button>
+<button onclick="openPrivateFriendSelect()" class="bg-pink-600 px-3 py-1 rounded text-sm"><i class="fa fa-user"></i> <span data-i18n="oneOnOne">一对一私聊</span></button>
 </div>
 </div>
 <div class="bg-slate-800 rounded-lg p-3 flex flex-col h-[400px]">
@@ -142,7 +142,7 @@ aspect-ratio:16/9; background:#000;
 <div id="friendModal" class="fixed inset-0 bg-black/70 hidden z-40 flex items-center justify-center">
 <div class="bg-slate-800 w-full max-w-md rounded-lg p-5 mx-4 max-h-[80vh] overflow-auto">
 <div class="flex justify-between mb-3">
-<h3 class="font-bold text-lg" data-i18n="friendList">好友列表</h3>
+<h3 class="font-bold text-lg" id="friendModalTitle" data-i18n="friendList">好友列表</h3>
 <button onclick="closeFriendPanel()" class="text-xl">&times;</button>
 </div>
 <div class="flex gap-2 mb-3">
@@ -157,6 +157,8 @@ aspect-ratio:16/9; background:#000;
 const SUPABASE_URL = "https://udmexrwaacjapoicvsfz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_u49G3mGU6cekwMlgV5Yc8w_xFUIkUVO";
 var supabase = null;
+let privateSelectMode = false;
+
 function loadScript(src) {
 return new Promise((resolve, reject) => {
 const s = document.createElement('script');
@@ -352,13 +354,15 @@ zh:{ welcome:"欢迎来到SyncWatch",username:"用户名",password:"Password",re
 friends:"好友",createRoom:"创建房间",logout:"退出",search:"搜索",play:"播放",pause:"暂停",
 syncTip:"房间内播放状态自动同步所有人",videoMembers:"视频参与者",openCam:"开启摄像头",
 closeCam:"关闭摄像头",mic:"麦克风",chatRoom:"房间聊天",friendList:"好友列表",add:"添加",
-joinRoom:"加入",roomId:"当前房间ID",inviteCode:"邀请码",clearChat:"清空聊天",oneOnOne:"一对一私聊"
+joinRoom:"加入",roomId:"当前房间ID",inviteCode:"邀请码",clearChat:"清空聊天",oneOnOne:"一对一私聊",
+selectFriendForPrivate:"选择好友创建私聊房间"
 },
 en:{ welcome:"Welcome to SyncWatch",username:"Username",password:"Password",register:"Register",login:"Login",
 friends:"Friends",createRoom:"Create Room",logout:"Logout",search:"Search",play:"Play",pause:"Pause",
 syncTip:"Playback sync for all members",videoMembers:"Video Participants",openCam:"Open Camera",
 closeCam:"Close Camera",mic:"Mic",chatRoom:"Room Chat",friendList:"Friend List",add:"Add",
-joinRoom:"Join",roomId:"Room ID",inviteCode:"Invite Code",clearChat:"Clear Chat",oneOnOne:"1‑to‑1 Chat"
+joinRoom:"Join",roomId:"Room ID",inviteCode:"Invite Code",clearChat:"Clear Chat",oneOnOne:"1‑to‑1 Chat",
+selectFriendForPrivate:"Select friend for private room"
 }
 };
 
@@ -467,12 +471,23 @@ async function createRoom(){
   await subscribeRoomMember();
 }
 
-async function createPrivateRoom(){
-if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+// 打开好友弹窗，切换为私聊选择好友模式
+async function openPrivateFriendSelect(){
+  if(!supabase) return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+  privateSelectMode = true;
+  document.getElementById("friendModalTitle").innerText = i18n[lang].selectFriendForPrivate;
+  document.getElementById("friendModal").classList.remove("hidden");
+  await loadFriendList();
 }
-privateRoomMode = true;
-await createRoom();
+
+// 选中好友，创建私聊房间
+async function createPrivateRoomByFriend(friendUserName){
+  closeFriendPanel();
+  privateRoomMode = true;
+  await createRoom();
+  alert(lang==="zh"?`✅私聊房间创建完成！把邀请码复制发给好友【${friendUserName}】加入`:`✅Private room created! Send invite code to friend ${friendUserName}`);
+  privateRoomMode = false;
+  privateSelectMode = false;
 }
 
 function searchMovie(){
@@ -652,8 +667,17 @@ function toggleAudio(){
   })
 }
 
-function openFriendPanel(){document.getElementById("friendModal").classList.remove("hidden");loadFriendList();}
-function closeFriendPanel(){document.getElementById("friendModal").classList.add("hidden");}
+function openFriendPanel(){
+  privateSelectMode = false;
+  document.getElementById("friendModalTitle").innerText = i18n[lang].friendList;
+  document.getElementById("friendModal").classList.remove("hidden");
+  loadFriendList();
+}
+
+function closeFriendPanel(){
+  privateSelectMode = false;
+  document.getElementById("friendModal").classList.add("hidden");
+}
 
 async function loadFriendList(){
 if(!supabase){
@@ -672,7 +696,11 @@ let btns = "";
 if(row.status === "pending"){
 btns = `<button onclick="acceptFriend('${row.id}')" class="bg-green-500 px-2 py-1 rounded text-sm mr-1">${lang==='zh'?'同意':'Accept'}</button> <button onclick="rejectFriend('${row.id}')" class="bg-red-500 px-2 py-1 rounded text-sm">${lang==='zh'?'拒绝':'Reject'}</button>`;
 }else if(row.status==="accept"){
-btns = `<span class="text-xs text-slate-400">${lang==='zh'?'已是好友':'Friends'}</span>`;
+  if(privateSelectMode){
+    btns = `<button onclick="createPrivateRoomByFriend('${f.username}')" class="bg-pink-500 px-2 py-1 rounded text-sm">${lang==='zh'?'创建私聊房间':'Create private room'}</button>`;
+  }else{
+    btns = `<span class="text-xs text-slate-400">${lang==='zh'?'已是好友':'Friends'}</span>`;
+  }
 }
 const div = document.createElement("div");
 div.className="mb-2 p-2 bg-slate-700 rounded flex justify-between items-center";
