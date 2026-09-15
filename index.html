@@ -29,6 +29,33 @@ aspect-ratio:16/9; background:#000;
 .online-dot{ width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block; }
 .offline-dot{ width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block; }
 .movie-result-item:hover{ background:#334155; }
+/* =========【新增】聊天气泡样式 ========= */
+.msg-self{
+  display:flex;
+  justify-content:flex-end;
+}
+.msg-other{
+  display:flex;
+  justify-content:flex-start;
+}
+.msg-bubble-self{
+  background-color:#6366f1;
+  padding:6px 10px;
+  border-radius:12px;
+  max-width:80%;
+}
+.msg-bubble-other{
+  background-color:#475569;
+  padding:6px 10px;
+  border-radius:12px;
+  max-width:80%;
+}
+.msg-time{
+  font-size:10px;
+  opacity:0.7;
+  margin-top:3px;
+  display:block;
+}
 </style>
 </head>
 <body class="min-h-screen">
@@ -116,7 +143,7 @@ aspect-ratio:16/9; background:#000;
 <h3 class="font-medium mb-2" data-i18n="chatRoom">房间聊天</h3>
 <div id="chatBox" class="scroll-chat flex-grow overflow-auto mb-3 text-sm space-y-2"></div>
 <div class="flex gap-2">
-<input id="chatInput" class="flex-grow p-2 rounded bg-slate-700" placeholder="输入消息..." data-placeholder-zh="输入消息..." data-placeholder-en="Type message...">
+<input id="chatInput" onkeydown="if(event.key==='Enter') sendChat()" class="flex-grow p-2 rounded bg-slate-700" placeholder="输入消息..." data-placeholder-zh="输入消息..." data-placeholder-en="Type message...">
 <button onclick="sendChat()" class="bg-indigo-500 px-3 rounded"><i class="fa fa-paper-plane"></i></button>
 </div>
 </div>
@@ -176,6 +203,11 @@ let privateRoomMode = false;
 let isRoomOwner = false;
 // =========新增WebRTC全局变量=========
 let signalSub = null;
+let roomStateSub = null;
+// =========【新增】视频拖拽全局变量=========
+let dragEl = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 // ========== 新增工具函数 ==========
 async function clearAllChannelsWait(){
     supabase.removeAllChannels();
@@ -192,6 +224,28 @@ chatChannel.on('postgres_changes', { event:'INSERT', schema:'public', table:'mes
 appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
+}
+// =========【新增】房间播放状态订阅，同步播放暂停 =========
+async function subscribeRoomState(){
+  if(!supabase || !currentRoomId) return;
+  const roomChannel = supabase.channel(`roomstate:${currentRoomId}`);
+  roomChannel.on('postgres_changes', {
+    event:"UPDATE",
+    schema:"public",
+    table:"rooms",
+    filter:`id=eq.${currentRoomId}`
+  },(payload)=>{
+    const newStatus = payload.new.play_status;
+    const iframe = document.getElementById("moviePlayer");
+    if(!iframe) return;
+    if(newStatus === "play"){
+      iframe.contentWindow.postMessage({type:"play"},"*");
+    }else if(newStatus === "pause"){
+      iframe.contentWindow.postMessage({type:"pause"},"*");
+    }
+  });
+  roomChannel.subscribe();
+  roomStateSub = roomChannel;
 }
 // ========= WebRTC信令实时订阅 表名 webrtc_signals =========
 async function subscribeWebRTCSignal(){
@@ -244,17 +298,43 @@ sendSignal(sig);
 peer.on("stream", (remoteStream)=>{
 console.log("✅拿到远端视频流！");
 renderRemoteVideo(remoteStream, remoteKey);
+updateMemberCount();
 });
 peer.on("close",()=>{
 removeRemoteVideo(remoteKey);
 delete peers[remoteKey];
+updateMemberCount();
 });
 peer.on("error",(err)=>{
 console.error("peer error",err);
 removeRemoteVideo(remoteKey);
 delete peers[remoteKey];
+updateMemberCount();
 })
 }
+// =========【新增】在线人数统计 =========
+function updateMemberCount(){
+  const count = Object.keys(peers).length + (localStream ? 1 : 0);
+  document.getElementById("memberCount").innerText = count;
+}
+// =========【新增】视频拖拽相关事件 =========
+document.addEventListener('mousedown',(e)=>{
+  if(!e.target.closest('.draggable-video')) return;
+  dragEl = e.target.closest('.draggable-video');
+  const rect = dragEl.getBoundingClientRect();
+  dragOffsetX = e.clientX - rect.left;
+  dragOffsetY = e.clientY - rect.top;
+  dragEl.style.position = "absolute";
+  dragEl.style.zIndex = "100";
+});
+document.addEventListener('mousemove',(e)=>{
+  if(!dragEl) return;
+  dragEl.style.left = (e.clientX - dragOffsetX)+"px";
+  dragEl.style.top = (e.clientY - dragOffsetY)+"px";
+});
+document.addEventListener('mouseup',()=>{
+  dragEl = null;
+});
 // =================================
 // 双语字典（新增词条）
 const i18n = {
@@ -362,6 +442,7 @@ async function createRoom(){
   document.getElementById("showInviteCode").innerText = currentInviteCode;
   await subscribeChat();
   await subscribeWebRTCSignal();
+  await subscribeRoomState();
 }
 // 创建一对一私聊房间
 async function createPrivateRoom(){
@@ -439,13 +520,23 @@ async function sendChat(){
   }
   document.getElementById("chatInput").value = "";
 }
+// =========【修改】聊天气泡区分自己和对方 =========
 function appendChat(name,text,time){
   const box = document.getElementById("chatBox");
   if (!box) return;
-  const div = document.createElement("div");
+  const isSelf = (name === currentUser.username);
+  const wrapDiv = document.createElement("div");
+  wrapDiv.className = isSelf ? "msg-self" : "msg-other";
+  const bubbleDiv = document.createElement("div");
+  bubbleDiv.className = isSelf ? "msg-bubble-self" : "msg-bubble-other";
   const timeStr = time ? new Date(time).toLocaleTimeString() : "";
-  div.innerHTML = `<span class="text-indigo-300">${name}</span> <span class="text-xs text-slate-400">${timeStr}</span>: ${text}`;
-  box.appendChild(div);
+  bubbleDiv.innerHTML = `
+    <div class="font-semibold text-xs">${name}</div>
+    <div>${text}</div>
+    <span class="msg-time">${timeStr}</span>
+  `;
+  wrapDiv.appendChild(bubbleDiv);
+  box.appendChild(wrapDiv);
   box.scrollTop = box.scrollHeight;
 }
 // 摄像头 Simple‑Peer版本
@@ -453,6 +544,7 @@ async function startLocalVideo() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     renderLocalVideo(localStream);
+    updateMemberCount();
     console.log("✅本地摄像头打开成功");
     const remoteKey = "peer-1";
     // 如果已经在房间，且还没有peer实例，立刻初始化P2P
@@ -479,6 +571,7 @@ function stopLocalVideo(){
   peers={};
   const localDom = document.getElementById("vid-local");
   if(localDom) localDom.remove();
+  updateMemberCount();
 }
 function renderLocalVideo(stream){
 const container = document.getElementById("videoContainer");
@@ -509,6 +602,7 @@ if(peers[uid]){
 peers[uid].destroy();
 delete peers[uid];
 }
+updateMemberCount();
 }
 function toggleAudio(){
   if(!localStream){
@@ -612,10 +706,10 @@ async function joinByInvite() {
   document.getElementById("showInviteCode").innerText = currentInviteCode;
   await subscribeChat();
   await subscribeWebRTCSignal();
+  await subscribeRoomState();
   alert("✅成功加入房间！现在可以发送聊天消息");
 }
 </script>
 </body>
 </html>
-
 
