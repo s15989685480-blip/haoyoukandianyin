@@ -117,7 +117,8 @@ aspect-ratio:16/9; background:#000;
 </div>
 <div id="movieResultList" class="bg-slate-800 rounded mb-2 max-h-32 overflow-y-auto hidden"></div>
 <div class="room-screen rounded-lg overflow-hidden border border-slate-700">
-<iframe id="moviePlayer" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
+<!-- 修复：iframe初始src置空，不再加载假域名 -->
+<iframe id="moviePlayer" src="" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
 </div>
 <div class="flex gap-2 mt-2 flex-wrap">
 <button onclick="playSync()" class="bg-green-600 px-3 py-1 rounded text-sm"><i class="fa fa-play"></i><span data-i18n="play">播放</span></button>
