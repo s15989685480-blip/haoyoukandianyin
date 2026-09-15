@@ -112,7 +112,7 @@ aspect-ratio:16/9; background:#000;
 <i class="fa fa-search absolute left-3 top-2.5 text-gray-400"></i>
 <input id="movieSearch" placeholder="🔍 搜索电影 Search movie..." class="w-full pl-9 p-2 rounded bg-slate-800 border border-slate-700">
 </div>
-<!-- ✅ 修改：增加 type="button"，阻止表单跳转 -->
+<!-- 修复：type="button"，阻止表单跳转 -->
 <button type="button" onclick="searchMovie()" class="bg-indigo-500 px-4 rounded"><i class="fa fa-google"></i> <span data-i18n="search">搜索</span></button>
 </div>
 <div id="movieResultList" class="bg-slate-800 rounded mb-2 max-h-32 overflow-y-auto hidden"></div>
@@ -242,9 +242,11 @@ return;
 }
 const chatChannel = supabase.channel(`chat:${currentRoomId}`);
 chatChannel.on('postgres_changes', { event:'INSERT', schema:'public', table:'messages_new', filter:`room_id=eq.${currentRoomId}` },(payload)=>{
+console.log("📩收到别人消息",payload.new);
 appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
+console.log("✅聊天订阅已开启");
 }
 async function subscribeRoomState(){
   if(!supabase || !currentRoomId) return;
@@ -485,7 +487,6 @@ const resultBox = document.getElementById("movieResultList");
 resultBox.classList.remove("hidden");
 // 显示loading云朵
 resultBox.innerHTML = `<div class="movie-loading"><i class="fa fa-cloud"></i></div>`;
-
 // 模拟加载延迟
 setTimeout(()=>{
   const mockItems = [
