@@ -499,34 +499,6 @@ async function startLocalVideo() {
       });
     };
 
-    // 订阅信令
-    if(signalSub) signalSub.unsubscribe();
-    signalSub = supabase.channel(`rtc:${currentRoomId}`)
-    .on("postgres_changes",{
-      event:"INSERT",
-      schema:"public",
-      table:"rtc_signals",
-      filter:`room_id=eq.${currentRoomId}`
-    },async (payload)=>{
-      const sig = payload.new.signal;
-      if(payload.new.from_user === currentUser.username) return;
-
-      if(sig.type === "offer"){
-        await pc.setRemoteDescription(new RTCSessionDescription(sig));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await supabase.from("rtc_signals").insert({
-          room_id: currentRoomId,
-          from_user: currentUser.username,
-          signal: answer
-        });
-      }else if(sig.type === "answer"){
-        await pc.setRemoteDescription(new RTCSessionDescription(sig));
-      }else if(sig.candidate){
-        await pc.addIceCandidate(new RTCIceCandidate(sig));
-      }
-    }).subscribe();
-
     // 发送offer
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -654,11 +626,14 @@ async function joinByInvite() {
     return;
   }
   await clearAllChannelsWait();
+  // ↓↓把这一行删掉！！ await subscribeWebRTCSignal();
+
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
     .eq("invite_code", inviteCode)
     .single();
+
   if (error || !data) {
     alert("找不到该房间");
     return;
@@ -667,8 +642,9 @@ async function joinByInvite() {
   currentInviteCode = inviteCode;
   document.getElementById("showRoomId").innerText = currentRoomId;
   document.getElementById("showInviteCode").innerText = currentInviteCode;
+
   await subscribeChat();
-  await subscribeWebRTCSignal();
+  await subscribeWebRTCSignal(); // ✅只保留这里，位置正确
   alert("✅成功加入房间！现在可以发送聊天消息");
 }
 </script>
