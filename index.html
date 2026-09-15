@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -13,34 +14,21 @@
 }
 body{background-color:var(--dark); color:#fff;}
 .video-box{
-background:#1e293b;
-border-radius:10px;
-overflow:hidden;
-position:relative;
+background:#1e293b; border-radius:10px; overflow:hidden; position:relative;
 }
 video{width:100%;height:100%;object-fit:cover;}
 .scroll-chat{
-overflow-y:auto;
-scrollbar-width:thin;
+overflow-y:auto; scrollbar-width:thin;
 }
 .scroll-chat::-webkit-scrollbar{width:4px;}
 .scroll-chat::-webkit-scrollbar-thumb{background:#475569;border-radius:2px;}
 .room-screen{
-aspect-ratio:16/9;
-background:#000;
+aspect-ratio:16/9; background:#000;
 }
-.draggable-video{
-cursor:move;
-}
-.online-dot{
-width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;
-}
-.offline-dot{
-width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block;
-}
-.movie-result-item:hover{
-background:#334155;
-}
+.draggable-video{ cursor:move; }
+.online-dot{ width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block; }
+.offline-dot{ width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block; }
+.movie-result-item:hover{ background:#334155; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -83,8 +71,7 @@ background:#334155;
 </div>
 </header>
 <div class="px-3 text-sm text-slate-400 py-1">
-<span data-i18n="roomId">当前房间ID</span>: <span id="showRoomId">-</span> |
-<span data-i18n="inviteCode">邀请码</span>: <span id="showInviteCode">-</span>
+<span data-i18n="roomId">当前房间ID</span>: <span id="showRoomId">-</span> | <span data-i18n="inviteCode">邀请码</span>: <span id="showInviteCode">-</span>
 </div>
 <div class="container mx-auto p-2 md:p-4">
 <!-- 顶部放映区域 + Google搜索框🔍 -->
@@ -201,9 +188,7 @@ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, w
 return;
 }
 const chatChannel = supabase.channel(`chat:${currentRoomId}`);
-chatChannel.on('postgres_changes', {
-event:'INSERT', schema:'public', table:'messages_new', filter:`room_id=eq.${currentRoomId}`
-},(payload)=>{
+chatChannel.on('postgres_changes', { event:'INSERT', schema:'public', table:'messages_new', filter:`room_id=eq.${currentRoomId}` },(payload)=>{
 appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
@@ -224,11 +209,8 @@ table:"webrtc_signals"
 const sig = payload.new;
 if(sig.from_user === currentUser.id) return;
 console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
-const remoteKey = "peer-1";
-
-// 【修复】移除错误stable判断，不拦截offer
-
-if (!peers[remoteKey] && localStream) {
+const remoteKey = "peer-1";  // 【修复】移除错误stable判断，不拦截offer
+ if (!peers[remoteKey] && localStream) {
     const isInitiator = !isRoomOwner;
     peers[remoteKey] = new SimplePeer({
         initiator: isInitiator,
@@ -238,8 +220,7 @@ if (!peers[remoteKey] && localStream) {
     setupPeerEvents(peers[remoteKey], remoteKey);
     console.log("收到远端offer，新建Peer，initiator=", isInitiator);
 }
-
-if(peers[remoteKey]){
+ if(peers[remoteKey]){
     peers[remoteKey].signal(sig.signal);
 }
 });
@@ -277,15 +258,13 @@ delete peers[remoteKey];
 // =================================
 // 双语字典（新增词条）
 const i18n = {
-zh:{
-welcome:"欢迎来到SyncWatch",username:"用户名",password:"Password",register:"注册",login:"登录",
+zh:{ welcome:"欢迎来到SyncWatch",username:"用户名",password:"Password",register:"注册",login:"登录",
 friends:"好友",createRoom:"创建房间",logout:"退出",search:"搜索",play:"播放",pause:"暂停",
 syncTip:"房间内播放状态自动同步所有人",videoMembers:"视频参与者",openCam:"开启摄像头",
 closeCam:"关闭摄像头",mic:"麦克风",chatRoom:"房间聊天",friendList:"好友列表",add:"添加",
 joinRoom:"加入",roomId:"当前房间ID",inviteCode:"邀请码",clearChat:"清空聊天",oneOnOne:"一对一私聊"
 },
-en:{
-welcome:"Welcome to SyncWatch",username:"Username",password:"Password",register:"Register",login:"Login",
+en:{ welcome:"Welcome to SyncWatch",username:"Username",password:"Password",register:"Register",login:"Login",
 friends:"Friends",createRoom:"Create Room",logout:"Logout",search:"Search",play:"Play",pause:"Pause",
 syncTip:"Playback sync for all members",videoMembers:"Video Participants",openCam:"Open Camera",
 closeCam:"Close Camera",mic:"Mic",chatRoom:"Room Chat",friendList:"Friend List",add:"Add",
@@ -401,21 +380,21 @@ resultBox.classList.remove("hidden");
 resultBox.innerHTML = "";
 window.open(`https://www.google.com/search?q=${encodeURIComponent(kw+" movie watch online")}`,"_blank");
 const mockItems = [
-{title: kw+" - Public Demo Source", url:""},
-{title: kw+" Trailer", url:""}
+ {title: kw+" - Public Demo Source", url:""},
+ {title: kw+" Trailer", url:""}
 ];
 mockItems.forEach(item=>{
-const div = document.createElement("div");
-div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
-div.innerText = item.title;
-div.onclick=()=>{
-const promptUrl = prompt(lang==="zh"?"粘贴公开iframe播放地址":"Paste public iframe url");
-if(promptUrl){
-document.getElementById("moviePlayer").src = promptUrl;
-}
-};
-resultBox.appendChild(div);
-})
+ const div = document.createElement("div");
+ div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
+ div.innerText = item.title;
+ div.onclick=()=>{
+ const promptUrl = prompt(lang==="zh"?"粘贴公开iframe播放地址":"Paste public iframe url");
+ if(promptUrl){
+ document.getElementById("moviePlayer").src = promptUrl;
+ }
+ };
+ resultBox.appendChild(div);
+ })
 }
 // 播放同步
 async function playSync(){
@@ -444,8 +423,6 @@ async function sendChat(){
   if(!msg || !currentRoomId || msg.length === 0){
     return;
   }
-  // 发送后立刻在自己页面渲染消息
-  appendChat(currentUser.username, msg, new Date().toISOString());
   const {error} = await supabase
     .from('messages_new')
     .insert({
@@ -519,8 +496,8 @@ const div = document.createElement("div");
 div.className="video-box draggable-video";
 div.id="vid-"+uid;
 div.innerHTML = `
-<video autoplay playsinline></video>
-<button onclick="removeRemoteVideo('${uid}')" class="absolute top-1 right-1 bg-red-500 text-xs px-1 rounded">×</button>
+ <video autoplay playsinline></video>
+ <button onclick="removeRemoteVideo('${uid}')" class="absolute top-1 right-1 bg-red-500 text-xs px-1 rounded">×</button>
 `;
 div.querySelector("video").srcObject = stream;
 container.appendChild(div);
@@ -574,8 +551,7 @@ const f = row.fuser;
 const onlineMark = f.is_online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
 let btns = "";
 if(row.status === "pending"){
-btns = `<button onclick="acceptFriend('${row.id}')" class="bg-green-500 px-2 py-1 rounded text-sm mr-1">${lang==='zh'?'同意':'Accept'}</button>
-<button onclick="rejectFriend('${row.id}')" class="bg-red-500 px-2 py-1 rounded text-sm">${lang==='zh'?'拒绝':'Reject'}</button>`;
+btns = `<button onclick="acceptFriend('${row.id}')" class="bg-green-500 px-2 py-1 rounded text-sm mr-1">${lang==='zh'?'同意':'Accept'}</button> <button onclick="rejectFriend('${row.id}')" class="bg-red-500 px-2 py-1 rounded text-sm">${lang==='zh'?'拒绝':'Reject'}</button>`;
 }else if(row.status==="accept"){
 btns = `<span class="text-xs text-slate-400">${lang==='zh'?'已是好友':'Friends'}</span>`;
 }
