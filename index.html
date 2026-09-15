@@ -529,9 +529,18 @@ delete peers[uid];
 }
 }
 function toggleAudio(){
-if(!localStream)return;
-const audioTrack = localStream.getAudioTracks()[0];
-audioTrack.enabled = !audioTrack.enabled;
+  if(!localStream){
+    alert(lang==="zh"?"请先打开摄像头！":"Open camera first!");
+    return;
+  }
+  const audioTracks = localStream.getAudioTracks();
+  if(audioTracks.length === 0){
+    alert(lang==="zh"?"没有检测到麦克风音频轨道":"No microphone audio track found");
+    return;
+  }
+  const track = audioTracks[0];
+  track.enabled = !track.enabled;
+  console.log("麦克风状态切换：", track.enabled ? "开启" : "关闭");
 }
 // 好友面板
 function openFriendPanel(){document.getElementById("friendModal").classList.remove("hidden");loadFriendList();}
@@ -618,3 +627,4 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
