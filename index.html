@@ -225,6 +225,11 @@ const sig = payload.new;
 if(sig.from_user === currentUser.id) return;
 console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
 const remoteKey = "peer-1";
+// 修复：连接已经stable就跳过重复offer，防止setRemoteDescription报错
+if(peers[remoteKey] && peers[remoteKey]._pc && peers[remoteKey]._pc.signalingState === "stable"){
+    console.log("连接已经stable，跳过重复offer");
+    return;
+}
 if(!peers[remoteKey] && localStream){
 peers[remoteKey] = new SimplePeer({initiator:false, trickle:false, stream:localStream});
 setupPeerEvents(peers[remoteKey], remoteKey);
@@ -434,11 +439,9 @@ async function sendChat(){
   if(!msg || !currentRoomId || msg.length === 0){
     return;
   }
-  const payload = {
-    room_id: currentRoomId,
-    author: currentUser.username,
-    content: msg
-  };
+  // 发送后立刻在自己页面渲染消息
+  appendChat(currentUser.username, msg, new Date().toISOString());
+
   const {error} = await supabase
     .from('messages_new')
     .insert({
@@ -633,3 +636,4 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
+
