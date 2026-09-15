@@ -226,13 +226,8 @@ if(sig.from_user === currentUser.id) return;
 console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
 const remoteKey = "peer-1";
 
-// 如果已经连接稳定，跳过重复offer
-if(peers[remoteKey]?. _pc?.signalingState === "stable"){
-    console.log("连接已经stable，跳过重复offer");
-    return;
-}
+// 【修复】移除错误stable判断，不拦截offer
 
-// 关键修复：收到offer，本地已经有摄像头流，立刻创建Peer实例应答
 if (!peers[remoteKey] && localStream) {
     const isInitiator = !isRoomOwner;
     peers[remoteKey] = new SimplePeer({
@@ -244,7 +239,6 @@ if (!peers[remoteKey] && localStream) {
     console.log("收到远端offer，新建Peer，initiator=", isInitiator);
 }
 
-// 有Peer实例，执行signal，生成answer
 if(peers[remoteKey]){
     peers[remoteKey].signal(sig.signal);
 }
