@@ -236,7 +236,6 @@ peers[remoteKey].signal(sig.signal);
 rtcChannel.subscribe();
 signalSub = rtcChannel;
 }
-
 async function sendSignal(signalObj){
   if(!supabase || !currentRoomId) return;
   await supabase.from("webrtc_signals").insert([{
@@ -246,7 +245,6 @@ async function sendSignal(signalObj){
     signal: signalObj
   }]);
 }
-
 function setupPeerEvents(peer, remoteKey){
 peer.on("signal", (sig)=>{
 console.log("📤发送信令");
@@ -266,7 +264,6 @@ removeRemoteVideo(remoteKey);
 delete peers[remoteKey];
 })
 }
-
 // =================================
 // 双语字典（新增词条）
 const i18n = {
@@ -541,6 +538,15 @@ function toggleAudio(){
   const track = audioTracks[0];
   track.enabled = !track.enabled;
   console.log("麦克风状态切换：", track.enabled ? "开启" : "关闭");
+  // 将更新后的音频轨道同步推送到所有P2P对端，修复远端不识别静音bug
+  Object.values(peers).forEach(peer=>{
+    if(peer && peer._pc){
+      const audioSender = peer._pc.getSenders().find(s => s.track?.kind === "audio");
+      if(audioSender){
+        audioSender.replaceTrack(track);
+      }
+    }
+  })
 }
 // 好友面板
 function openFriendPanel(){document.getElementById("friendModal").classList.remove("hidden");loadFriendList();}
@@ -627,4 +633,3 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
-
