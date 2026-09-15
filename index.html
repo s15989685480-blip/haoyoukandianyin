@@ -646,6 +646,7 @@ async function joinByInvite() {
   await subscribeChat();
   await subscribeWebRTCSignal(); // ✅只保留这里，位置正确
   alert("✅成功加入房间！现在可以发送聊天消息");
+  initPeerConnection();
 }
 </script>
 </body>
