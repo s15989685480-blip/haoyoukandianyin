@@ -6,12 +6,9 @@
 <title>SyncWatch | 同步观影视频聊天室</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
 <style>
-:root{
---primary:#6366f1;
---dark:#0f172a;
-}
+:root{ --primary:#6366f1; --dark:#0f172a; }
 body{background-color:var(--dark); color:#fff;}
 .video-box{
 background:#1e293b; border-radius:10px; overflow:hidden; position:relative;
@@ -29,41 +26,13 @@ aspect-ratio:16/9; background:#000;
 .online-dot{ width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block; }
 .offline-dot{ width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block; }
 .movie-result-item:hover{ background:#334155; }
-.msg-self{
-  display:flex;
-  justify-content:flex-end;
-}
-.msg-other{
-  display:flex;
-  justify-content:flex-start;
-}
-.msg-bubble-self{
-  background-color:#6366f1;
-  padding:6px 10px;
-  border-radius:12px;
-  max-width:80%;
-}
-.msg-bubble-other{
-  background-color:#475569;
-  padding:6px 10px;
-  border-radius:12px;
-  max-width:80%;
-}
-.msg-time{
-  font-size:10px;
-  opacity:0.7;
-  margin-top:3px;
-  display:block;
-}
+.msg-self{   display:flex;   justify-content:flex-end; }
+.msg-other{   display:flex;   justify-content:flex-start; }
+.msg-bubble-self{   background-color:#6366f1;   padding:6px 10px;   border-radius:12px;   max-width:80%; }
+.msg-bubble-other{   background-color:#475569;   padding:6px 10px;   border-radius:12px;   max-width:80%; }
+.msg-time{   font-size:10px;   opacity:0.7;   margin-top:3px;   display:block; }
 /* 搜索loading云朵样式 */
-.movie-loading{
-  min-height:200px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#94a3b8;
-  font-size:40px;
-}
+.movie-loading{   min-height:200px;   display:flex;   align-items:center;   justify-content:center;   color:#94a3b8;   font-size:40px; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -117,8 +86,8 @@ aspect-ratio:16/9; background:#000;
 </div>
 <div id="movieResultList" class="bg-slate-800 rounded mb-2 max-h-32 overflow-y-auto hidden"></div>
 <div class="room-screen rounded-lg overflow-hidden border border-slate-700">
-<!-- 修复：iframe初始src置空，不再加载假域名 -->
-<iframe id="moviePlayer" src="" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
+<!-- 替换iframe为原生video标签 -->
+<video id="moviePlayer" class="w-full h-full" controls></video>
 </div>
 <div class="flex gap-2 mt-2 flex-wrap">
 <button onclick="playSync()" class="bg-green-600 px-3 py-1 rounded text-sm"><i class="fa fa-play"></i><span data-i18n="play">播放</span></button>
@@ -238,13 +207,13 @@ async function subscribeRoomMember(){
 }
 async function subscribeChat(){
 if(!supabase){
-alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-return;
+ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return;
 }
 const chatChannel = supabase.channel(`chat:${currentRoomId}`);
 chatChannel.on('postgres_changes', { event:'INSERT', schema:'public', table:'messages_new', filter:`room_id=eq.${currentRoomId}` },(payload)=>{
-console.log("📩收到别人消息",payload.new);
-appendChat(payload.new.author, payload.new.content, payload.new.created_at);
+ console.log("📩收到别人消息",payload.new);
+ appendChat(payload.new.author, payload.new.content, payload.new.created_at);
 });
 chatChannel.subscribe();
 console.log("✅聊天订阅已开启");
@@ -257,14 +226,14 @@ async function subscribeRoomState(){
     schema:"public",
     table:"rooms",
     filter:`id=eq.${currentRoomId}`
-  },(payload)=>{
+  },async (payload)=>{
     const newStatus = payload.new.play_status;
-    const iframe = document.getElementById("moviePlayer");
-    if(!iframe) return;
+    const video = document.getElementById("moviePlayer");
+    if(!video) return;
     if(newStatus === "play"){
-      iframe.contentWindow.postMessage({type:"play"},"*");
+        await video.play().catch(e=>console.log("播放拦截",e));
     }else if(newStatus === "pause"){
-      iframe.contentWindow.postMessage({type:"pause"},"*");
+        video.pause();
     }
   });
   roomChannel.subscribe();
@@ -273,32 +242,30 @@ async function subscribeRoomState(){
 async function subscribeWebRTCSignal(){
 console.log("🔔 WebRTC订阅函数开始执行");
 if(!supabase){
-alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
-return;
+ alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return;
 }
 const rtcChannel = supabase.channel(`rtc:${currentRoomId}`);
 rtcChannel.on('postgres_changes',{
-event:"INSERT",
-schema:"public",
-table:"webrtc_signals"
+ event:"INSERT", schema:"public", table:"webrtc_signals"
 },async (payload)=>{
-const sig = payload.new;
-if(sig.from_user === currentUser.id) return;
-console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
-const remoteKey = "peer-1";
- if (!peers[remoteKey] && localStream) {
-    const isInitiator = !isRoomOwner;
-    peers[remoteKey] = new SimplePeer({
-        initiator: isInitiator,
-        trickle: false,
-        stream: localStream
-    });
-    setupPeerEvents(peers[remoteKey], remoteKey);
-    console.log("收到远端offer，新建Peer，initiator=", isInitiator);
-}
- if(peers[remoteKey]){
-    peers[remoteKey].signal(sig.signal);
-}
+ const sig = payload.new;
+ if(sig.from_user === currentUser.id) return;
+ console.log("📩收到远端信令 type:", sig.signal && sig.signal.type);
+ const remoteKey = "peer-1";
+  if (!peers[remoteKey] && localStream) {
+     const isInitiator = !isRoomOwner;
+     peers[remoteKey] = new SimplePeer({
+         initiator: isInitiator,
+         trickle: false,
+         stream: localStream
+     });
+     setupPeerEvents(peers[remoteKey], remoteKey);
+     console.log("收到远端offer，新建Peer，initiator=", isInitiator);
+ }
+  if(peers[remoteKey]){
+     peers[remoteKey].signal(sig.signal);
+  }
 });
 rtcChannel.subscribe();
 signalSub = rtcChannel;
@@ -314,21 +281,21 @@ async function sendSignal(signalObj){
 }
 function setupPeerEvents(peer, remoteKey){
 peer.on("signal", (sig)=>{
-console.log("📤发送信令");
-sendSignal(sig);
+ console.log("📤发送信令");
+ sendSignal(sig);
 });
 peer.on("stream", (remoteStream)=>{
-console.log("✅拿到远端视频流！");
-renderRemoteVideo(remoteStream, remoteKey);
+ console.log("✅拿到远端视频流！");
+ renderRemoteVideo(remoteStream, remoteKey);
 });
 peer.on("close",()=>{
-removeRemoteVideo(remoteKey);
-delete peers[remoteKey];
+ removeRemoteVideo(remoteKey);
+ delete peers[remoteKey];
 });
 peer.on("error",(err)=>{
-console.error("peer error",err);
-removeRemoteVideo(remoteKey);
-delete peers[remoteKey];
+ console.error("peer error",err);
+ removeRemoteVideo(remoteKey);
+ delete peers[remoteKey];
 })
 }
 document.addEventListener('mousedown',(e)=>{
@@ -349,29 +316,31 @@ document.addEventListener('mouseup',()=>{
   dragEl = null;
 });
 const i18n = {
-zh:{ welcome:"欢迎来到SyncWatch",username:"用户名",password:"Password",register:"注册",login:"登录",
-friends:"好友",createRoom:"创建房间",logout:"退出",search:"搜索",play:"播放",pause:"暂停",
-syncTip:"房间内播放状态自动同步所有人",videoMembers:"视频参与者",openCam:"开启摄像头",
-closeCam:"关闭摄像头",mic:"麦克风",chatRoom:"房间聊天",friendList:"好友列表",add:"添加",
-joinRoom:"加入",roomId:"当前房间ID",inviteCode:"邀请码",clearChat:"清空聊天",oneOnOne:"一对一私聊",
-selectFriendForPrivate:"选择好友创建私聊房间"
+zh:{
+ welcome:"欢迎来到SyncWatch",username:"用户名",password:"Password",register:"注册",login:"Login",
+ friends:"好友",createRoom:"创建房间",logout:"退出",search:"搜索",play:"播放",pause:"Pause",
+ syncTip:"房间内播放状态自动同步所有人",videoMembers:"视频参与者",openCam:"开启摄像头",
+ closeCam:"关闭摄像头",mic:"麦克风",chatRoom:"房间聊天",friendList:"好友列表",add:"添加",
+ joinRoom:"加入",roomId:"当前房间ID",inviteCode:"邀请码",clearChat:"清空聊天",oneOnOne:"一对一私聊",
+ selectFriendForPrivate:"选择好友创建私聊房间"
 },
-en:{ welcome:"Welcome to SyncWatch",username:"Username",password:"Password",register:"Register",login:"Login",
-friends:"Friends",createRoom:"Create Room",logout:"Logout",search:"Search",play:"Play",pause:"Pause",
-syncTip:"Playback sync for all members",videoMembers:"Video Participants",openCam:"Open Camera",
-closeCam:"Close Camera",mic:"Mic",chatRoom:"Room Chat",friendList:"Friend List",add:"Add",
-joinRoom:"Join",roomId:"Room ID",inviteCode:"Invite Code",clearChat:"Clear Chat",oneOnOne:"1‑to‑1 Chat",
-selectFriendForPrivate:"Select friend for private room"
+en:{
+ welcome:"Welcome to SyncWatch",username:"Username",password:"Password",register:"Register",login:"Login",
+ friends:"Friends",createRoom:"Create Room",logout:"Logout",search:"Search",play:"Play",pause:"Pause",
+ syncTip:"Playback sync for all members",videoMembers:"Video Participants",openCam:"Open Camera",
+ closeCam:"Close Camera",mic:"Mic",chatRoom:"Room Chat",friendList:"Friend List",add:"Add",
+ joinRoom:"Join",roomId:"Room ID",inviteCode:"Invite Code",clearChat:"Clear Chat",oneOnOne:"1‑to‑1 Chat",
+ selectFriendForPrivate:"Select friend for private room"
 }
 };
 function switchLang(){
 lang = document.getElementById("langSelect").value;
 document.querySelectorAll("[data-i18n]").forEach(el=>{
-const key = el.getAttribute("data-i18n");
-el.innerText = i18n[lang][key];
+ const key = el.getAttribute("data-i18n");
+ el.innerText = i18n[lang][key];
 })
 document.querySelectorAll("[data-placeholder-zh]").forEach(input=>{
-input.placeholder = lang==="zh"?input.dataset.placeholderZh:input.dataset.placeholderEn;
+ input.placeholder = lang==="zh"?input.dataset.placeholderZh:input.dataset.placeholderEn;
 })
 }
 function genInviteCode(){
@@ -379,7 +348,7 @@ return Math.random().toString(36).substring(2,8).toUpperCase();
 }
 async function registerUser(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 const uname = document.getElementById("usernameInput").value.trim();
 const pwd = document.getElementById("pwdInput").value.trim();
@@ -392,7 +361,7 @@ showMain();
 }
 async function loginUser(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 const uname = document.getElementById("usernameInput").value.trim();
 const pwd = document.getElementById("pwdInput").value.trim();
@@ -408,7 +377,7 @@ document.getElementById("mainPage").classList.remove("hidden");
 }
 async function logout(){
 if(!supabase){
-return;
+ return;
 }
 await clearAllChannelsWait();
 // 删除本用户在房间成员表的记录
@@ -479,7 +448,7 @@ async function createPrivateRoomByFriend(friendUserName){
   privateRoomMode = false;
   privateSelectMode = false;
 }
-// ✅修复搜索：点击条目只加载播放器，不会跳转谷歌
+// ✅修复搜索：使用真实公开MP4视频地址，点击直接加载video播放器
 function searchMovie(){
 console.log("搜索按钮点击触发");
 const kw = document.getElementById("movieSearch").value.trim();
@@ -491,8 +460,8 @@ resultBox.innerHTML = `<div class="movie-loading"><i class="fa fa-cloud"></i></d
 // 模拟加载延迟
 setTimeout(()=>{
   const mockItems = [
-   {title: kw+" - Public Demo Source", url:"https://example-demo-iframe-url.com/embed", searchGoogle: kw},
-   {title: kw+" Trailer", url:"https://example-trailer-iframe-url.com/embed", searchGoogle: kw}
+   {title: kw+" - 演示测试视频", url:"https://www.w3schools.com/html/mov_bbb.mp4"},
+   {title: kw+" 短片样例", url:"https://www.w3schools.com/html/movie.mp4"}
   ];
   resultBox.innerHTML = "";
   mockItems.forEach(item=>{
@@ -500,8 +469,11 @@ setTimeout(()=>{
    div.className="p-2 movie-result-item cursor-pointer border-b border-slate-700";
    div.innerText = item.title;
    div.onclick=()=>{
-      // 仅加载iframe，删除谷歌跳转
-      document.getElementById("moviePlayer").src = item.url;
+      // 直接赋值video.src，不再使用iframe
+      const video = document.getElementById("moviePlayer");
+      video.src = item.url;
+      // 存入房间数据库
+      supabase.from("rooms").update({movie_url:item.url}).eq("id",currentRoomId);
    };
    resultBox.appendChild(div);
   })
@@ -509,7 +481,7 @@ setTimeout(()=>{
 }
 async function playSync(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 if(!currentRoomId) {
   alert(lang==="zh"?"请先创建或加入房间！":"Please create/join room first!");
@@ -523,7 +495,7 @@ if(error){
 }
 async function pauseSync(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 if(!currentRoomId) {
   alert(lang==="zh"?"请先创建或加入房间！":"Please create/join room first!");
@@ -627,7 +599,7 @@ div.className="video-box draggable-video";
 div.id="vid-"+uid;
 div.innerHTML = `
  <video autoplay playsinline></video>
- <button onclick="removeRemoteVideo('${uid}')" class="absolute top-1 right-1 bg-red-500 text-xs px-1 rounded">×</button>
+  <button onclick="removeRemoteVideo('${uid}')" class="absolute top-1 right-1 bg-red-500 text-xs px-1 rounded">×</button>
 `;
 div.querySelector("video").srcObject = stream;
 container.appendChild(div);
@@ -636,8 +608,8 @@ function removeRemoteVideo(uid){
 const el = document.getElementById("vid-"+uid);
 if(el) el.remove();
 if(peers[uid]){
-peers[uid].destroy();
-delete peers[uid];
+  peers[uid].destroy();
+  delete peers[uid];
 }
 }
 function toggleAudio(){
@@ -674,7 +646,7 @@ function closeFriendPanel(){
 }
 async function loadFriendList(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 const dom = document.getElementById("friendListDom");
 dom.innerHTML="";
@@ -683,27 +655,27 @@ const {data} = await supabase.from("friends")
 .eq("user_id",currentUser.id);
 if(!data)return;
 data.forEach(row=>{
-const f = row.fuser;
-const onlineMark = f.is_online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
-let btns = "";
-if(row.status === "pending"){
-btns = `<button onclick="acceptFriend('${row.id}')" class="bg-green-500 px-2 py-1 rounded text-sm mr-1">${lang==='zh'?'同意':'Accept'}</button> <button onclick="rejectFriend('${row.id}')" class="bg-red-500 px-2 py-1 rounded text-sm">${lang==='zh'?'拒绝':'Reject'}</button>`;
-}else if(row.status==="accept"){
-  if(privateSelectMode){
-    btns = `<button onclick="createPrivateRoomByFriend('${f.username}')" class="bg-pink-500 px-2 py-1 rounded text-sm">${lang==='zh'?'创建私聊房间':'Create private room'}</button>`;
-  }else{
-    btns = `<span class="text-xs text-slate-400">${lang==='zh'?'已是好友':'Friends'}</span>`;
-  }
-}
-const div = document.createElement("div");
-div.className="mb-2 p-2 bg-slate-700 rounded flex justify-between items-center";
-div.innerHTML = `<div>${onlineMark} ${f.username}</div><div>${btns}</div>`;
-dom.appendChild(div);
+ const f = row.fuser;
+ const onlineMark = f.is_online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
+ let btns = "";
+ if(row.status === "pending"){
+ btns = `<button onclick="acceptFriend('${row.id}')" class="bg-green-500 px-2 py-1 rounded text-sm mr-1">${lang==='zh'?'同意':'Accept'}</button> <button onclick="rejectFriend('${row.id}')" class="bg-red-500 px-2 py-1 rounded text-sm">${lang==='zh'?'拒绝':'Reject'}</button>`;
+ }else if(row.status==="accept"){
+   if(privateSelectMode){
+     btns = `<button onclick="createPrivateRoomByFriend('${f.username}')" class="bg-pink-500 px-2 py-1 rounded text-sm">${lang==='zh'?'创建私聊房间':'Create private room'}</button>`;
+   }else{
+     btns = `<span class="text-xs text-slate-400">${lang==='zh'?'已是好友':'Friends'}</span>`;
+   }
+ }
+ const div = document.createElement("div");
+ div.className="mb-2 p-2 bg-slate-700 rounded flex justify-between items-center";
+ div.innerHTML = `<div>${onlineMark} ${f.username}</div><div>${btns}</div>`;
+ dom.appendChild(div);
 })
 }
 async function sendFriendReq(){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 const fname = document.getElementById("addFriendInput").value.trim();
 const {data}=await supabase.from("users").select("*").eq("username",fname).single();
@@ -714,14 +686,14 @@ loadFriendList();
 }
 async function acceptFriend(rowId){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 await supabase.from("friends").update({status:"accept"}).eq("id",rowId);
 loadFriendList();
 }
 async function rejectFriend(rowId){
 if(!supabase){
-return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
+ return alert(lang==="zh"?"数据库还在加载，请稍等重试":"Database loading, wait and retry");
 }
 await supabase.from("friends").update({status:"reject"}).eq("id",rowId);
 loadFriendList();
@@ -758,5 +730,3 @@ async function joinByInvite() {
 </script>
 </body>
 </html>
-
-
